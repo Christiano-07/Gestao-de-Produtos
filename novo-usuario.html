@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="/firebase.js"></script>
+  <title>Novo Produto</title>
+</head>
+<body class="bg-gray-50 min-h-screen flex">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-white shadow-md p-6">
+    <h2 class="text-xl font-bold mb-8">Gestor de Produtos</h2>
+    <nav class="space-y-2">
+      <a href="dashboard.html" class="block text-gray-600 hover:text-blue-600">Dashboard</a>
+      <a href="produtos.html" class="block text-blue-600 font-semibold">Produtos</a>
+      <a href="usuarios.html" class="block text-gray-600 hover:text-blue-600">Usuários</a>
+      <button id="logoutBtn" class="mt-8 text-red-500 hover:text-red-700">Sair</button>
+    </nav>
+  </aside>
+
+  <!-- Conteúdo -->
+  <main class="flex-1 p-8">
+    <h1 class="text-2xl font-semibold mb-6">Cadastrar Novo Produto</h1>
+
+    <form id="produtoForm" class="bg-white p-6 rounded-xl shadow max-w-lg space-y-4">
+      <input id="nome" type="text" placeholder="Nome do Produto" class="w-full border p-2 rounded" required>
+      <input id="sku" type="text" placeholder="SKU" class="w-full border p-2 rounded" required>
+      <select id="categoria" class="w-full border p-2 rounded" required>
+        <option value="">Selecione a Categoria</option>
+        <option value="Eletrônicos">Eletrônicos</option>
+        <option value="Móveis">Móveis</option>
+        <option value="Limpeza">Limpeza</option>
+        <option value="Higiene">Higiene</option>
+        <option value="Alimento">Alimento</option>
+        <option value="Bebidas">Bebidas</option>
+        <option value="Congelados">Congelados</option>
+        <option value="Saúde">Saúde</option>
+        <option value="Utilidades">Utilidades</option>
+        <option value="Infantil">Infantil</option>
+      </select>
+      <input id="preco" type="number" step="0.01" placeholder="Preço" class="w-full border p-2 rounded" required>
+      <input id="estoque" type="number" placeholder="Quantidade em estoque" class="w-full border p-2 rounded" required>
+
+      <div class="flex justify-between mt-4">
+        <button type="button" id="voltar"
+          class="bg-gray-400 hover:bg-gray-500 text-white rounded-xl px-4 py-2">
+          Voltar
+        </button>
+        <button type="submit"
+          class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2">
+          Salvar Produto
+        </button>
+      </div>
+    </form>
+  </main>
+
+  <script type="module">
+    import { auth, db } from "./firebase.js";
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import { collection, addDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+    const form = document.getElementById("produtoForm");
+    const voltar = document.getElementById("voltar");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    voltar.addEventListener("click", () => (window.location.href = "produtos.html"));
+    logoutBtn.addEventListener("click", () => signOut(auth).then(() => (window.location = "index.html")));
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user) window.location = "index.html";
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const nome = document.getElementById("nome").value;
+      const sku = document.getElementById("sku").value;
+      const categoria = document.getElementById("categoria").value;
+      const preco = parseFloat(document.getElementById("preco").value);
+      const estoque = parseInt(document.getElementById("estoque").value);
+
+      try {
+        await addDoc(collection(db, "produtos"), {
+          nome, sku, categoria, preco, estoque,
+        });
+        alert("Produto cadastrado com sucesso!");
+        window.location.href = "produtos.html";
+      } catch (error) {
+        alert("Erro ao cadastrar produto!");
+        console.error(error);
+      }
+    });
+  </script>
+</body>
+</html>

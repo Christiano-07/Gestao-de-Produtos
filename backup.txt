@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="/firebase.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-white shadow-md p-6">
+    <h2 class="text-xl font-bold mb-8">Gestor de Produtos</h2>
+    <nav class="space-y-2">
+      <a href="dashboard.html" class="block text-blue-600 font-semibold">Dashboard</a>
+      <a href="produtos.html" class="block text-gray-600 hover:text-blue-600">Produtos</a>
+      <button id="logoutBtn" class="mt-8 text-red-500 hover:text-red-700">Sair</button>
+    </nav>
+  </aside>
+
+  <!-- Conteúdo principal -->
+  <main class="flex-1 p-8">
+    <h1 class="text-2xl font-semibold mb-6">Visão Geral</h1>
+
+    <!-- Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div class="p-4 bg-white rounded-xl shadow text-center">
+        <p class="text-gray-500 text-sm">Total de Produtos</p>
+        <h3 id="totalProdutos" class="text-2xl font-bold">0</h3>
+      </div>
+      <div class="p-4 bg-white rounded-xl shadow text-center">
+        <p class="text-gray-500 text-sm">Valor Total em Estoque</p>
+        <h3 id="valorTotal" class="text-2xl font-bold text-green-600">R$ 0,00</h3>
+      </div>
+      <div class="p-4 bg-white rounded-xl shadow text-center">
+        <p class="text-gray-500 text-sm">Estoque Baixo</p>
+        <h3 id="estoqueBaixo" class="text-2xl font-bold text-yellow-500">0</h3>
+      </div>
+      <div class="p-4 bg-white rounded-xl shadow text-center">
+        <p class="text-gray-500 text-sm">Sem Estoque</p>
+        <h3 id="semEstoque" class="text-2xl font-bold text-red-600">0</h3>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { auth, db } from "./firebase.js";
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import { collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+    const logoutBtn = document.getElementById("logoutBtn");
+    logoutBtn.addEventListener("click", () => signOut(auth).then(() => (window.location = "index.html")));
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return (window.location = "index.html");
+
+      const produtosRef = collection(db, "produtos");
+      const snapshot = await getDocs(produtosRef);
+
+      let total = 0, valor = 0, baixo = 0, sem = 0;
+      snapshot.forEach((doc) => {
+        const p = doc.data();
+        total++;
+        valor += p.preco * p.estoque;
+        if (p.estoque === 0) sem++;
+        if (p.estoque > 0 && p.estoque <= 5) baixo++;
+      });
+
+      document.getElementById("totalProdutos").textContent = total;
+      document.getElementById("valorTotal").textContent = `R$ ${valor.toFixed(2)}`;
+      document.getElementById("estoqueBaixo").textContent = baixo;
+      document.getElementById("semEstoque").textContent = sem;
+    });
+  </script>
+</body>
+</html>
+
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="/firebase.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex">
+
+  <aside class="w-64 bg-white shadow-md p-6">
+    <h2 class="text-xl font-bold mb-8">Gestor de Produtos</h2>
+    <nav class="space-y-2">
+      <a href="dashboard.html" class="block text-gray-600 hover:text-blue-600">Dashboard</a>
+      <a href="produtos.html" class="block text-blue-600 font-semibold">Produtos</a>
+      <button id="logoutBtn" class="mt-8 text-red-500 hover:text-red-700">Sair</button>
+    </nav>
+  </aside>
+
+  <main class="flex-1 p-8">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-semibold">Produtos</h1>
+      <button id="addProduto" class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2">
+        + Novo Produto
+      </button>
+    </div>
+
+    <table class="w-full text-left bg-white rounded-xl shadow">
+      <thead>
+        <tr class="border-b">
+          <th class="p-3">Produto</th>
+          <th class="p-3">SKU</th>
+          <th class="p-3">Categoria</th>
+          <th class="p-3">Preço</th>
+          <th class="p-3">Estoque</th>
+        </tr>
+      </thead>
+      <tbody id="listaProdutos"></tbody>
+    </table>
+  </main>
+
+  <script type="module">
+    import { auth, db } from "./firebase.js";
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import { collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+    const lista = document.getElementById("listaProdutos");
+    const logoutBtn = document.getElementById("logoutBtn");
+    logoutBtn.addEventListener("click", () => signOut(auth).then(() => (window.location = "index.html")));
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return (window.location = "index.html");
+
+      const produtosRef = collection(db, "produtos");
+      const snapshot = await getDocs(produtosRef);
+      snapshot.forEach((doc) => {
+        const p = doc.data();
+        lista.innerHTML += `
+          <tr class="border-b hover:bg-gray-50">
+            <td class="p-3">${p.nome}</td>
+            <td class="p-3">${p.sku}</td>
+            <td class="p-3">${p.categoria}</td>
+            <td class="p-3">R$ ${p.preco}</td>
+            <td class="p-3">${p.estoque}</td>
+          </tr>`;
+      });
+    });
+  </script>
+</body>
+</html>
+
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login - Gestor de Produtos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="/firebase.js"></script>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen">
+
+  <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm">
+    <h1 class="text-2xl font-semibold text-center mb-6">Gestor de Produtos</h1>
+
+    <form id="loginForm" class="space-y-4">
+      <input id="email" type="email" placeholder="Email"
+        class="w-full border-b border-gray-300 p-2 focus:outline-none focus:border-blue-500" required />
+      <input id="password" type="password" placeholder="Senha"
+        class="w-full border-b border-gray-300 p-2 focus:outline-none focus:border-blue-500" required />
+      <button type="submit"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-2 transition">
+        Entrar
+      </button>
+    </form>
+
+    <p class="text-xs text-gray-400 text-center mt-4">
+      Admin: admin@admin<br />Senha: admin123
+    </p>
+  </div>
+
+  <script>
+    import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import { auth } from "./firebase.js";
+
+    const loginForm = document.getElementById("loginForm");
+    loginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = email.value;
+      const password = password.value;
+
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        window.location.href = "dashboard.html";
+      } catch (error) {
+        alert("Usuário ou senha incorretos");
+      }
+    });
+  </script>
+</body>
+</html>

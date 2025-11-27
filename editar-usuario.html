@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="/firebase.js"></script>
+  <title>Editar Usuário</title>
+</head>
+<body class="bg-gray-50 min-h-screen flex">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-white shadow-md p-6">
+    <h2 class="text-xl font-bold mb-8">Gestor de Produtos</h2>
+    <nav class="space-y-2">
+      <a href="dashboard.html" class="block text-gray-600 hover:text-blue-600">Dashboard</a>
+      <a href="produtos.html" class="block text-gray-600 hover:text-blue-600">Produtos</a>
+      <a href="usuarios.html" class="block text-blue-600 font-semibold">Usuários</a>
+      <button id="logoutBtn" class="mt-8 text-red-500 hover:text-red-700">Sair</button>
+    </nav>
+  </aside>
+
+  <!-- Conteúdo -->
+  <main class="flex-1 p-8">
+    <h1 class="text-2xl font-semibold mb-6">Editar Usuário</h1>
+
+    <form id="usuarioForm" class="bg-white p-6 rounded-xl shadow max-w-lg space-y-4">
+      <input id="nome" type="text" placeholder="Nome Completo" class="w-full border p-2 rounded" required>
+      <input id="email" type="email" placeholder="Email" class="w-full border p-2 rounded" required>
+      <input id="senha" type="password" placeholder="Nova Senha (deixe em branco para manter)" class="w-full border p-2 rounded">
+      <select id="tipo" class="w-full border p-2 rounded" required>
+        <option value="">Selecione o tipo</option>
+        <option value="admin">Administrador</option>
+        <option value="usuario">Usuário</option>
+      </select>
+
+      <div class="flex justify-between mt-4">
+        <button type="button" id="voltar"
+          class="bg-gray-400 hover:bg-gray-500 text-white rounded-xl px-4 py-2">
+          Voltar
+        </button>
+        <button type="submit"
+          class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2">
+          Atualizar Usuário
+        </button>
+      </div>
+    </form>
+  </main>
+
+  <script type="module">
+    import { auth, db } from "./firebase.js";
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+    const form = document.getElementById("usuarioForm");
+    const voltar = document.getElementById("voltar");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    voltar.addEventListener("click", () => (window.location.href = "usuarios.html"));
+    logoutBtn.addEventListener("click", () => signOut(auth).then(() => (window.location = "index.html")));
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) window.location = "index.html";
+
+      // Carrega os dados do usuário
+      const urlParams = new URLSearchParams(window.location.search);
+      const userId = urlParams.get('id');
+      
+      if (userId) {
+        const userDoc = await getDoc(doc(db, "usuarios", userId));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          document.getElementById('nome').value = userData.nome;
+          document.getElementById('email').value = userData.email;
+          document.getElementById('tipo').value = userData.tipo;
+        }
+      }
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const userId = urlParams.get('id');
+
+      const nome = document.getElementById("nome").value;
+      const email = document.getElementById("email").value;
+      const senha = document.getElementById("senha").value;
+      const tipo = document.getElementById("tipo").value;
+
+      try {
+        await updateDoc(doc(db, "usuarios", userId), {
+          nome,
+          email,
+          tipo
+        });
+        
+        alert("Usuário atualizado com sucesso!");
+        window.location.href = "usuarios.html";
+      } catch (error) {
+        alert("Erro ao atualizar usuário!");
+        console.error(error);
+      }
+    });
+  </script>
+</body>
+</html>

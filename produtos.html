@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="/firebase.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-white shadow-md p-6">
+    <h2 class="text-xl font-bold mb-8">Gestor de Produtos</h2>
+    <nav class="space-y-2">
+      <a href="dashboard.html" class="block text-gray-600 hover:text-blue-600">Dashboard</a>
+      <a href="produtos.html" class="block text-blue-600 font-semibold">Produtos</a>
+      <a href="usuarios.html" class="block text-gray-600 hover:text-blue-600">Usuários</a>
+      <button id="logoutBtn" class="mt-8 text-red-500 hover:text-red-700">Sair</button>
+    </nav>
+  </aside>
+
+  <!-- Conteúdo principal -->
+  <main class="flex-1 p-8">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-semibold">Produtos</h1>
+      <button id="addProduto" class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2">
+        + Novo Produto
+      </button>
+    </div>
+
+    <!-- Filtros e Pesquisa -->
+    <div class="bg-white p-4 rounded-xl shadow mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Pesquisar por Nome</label>
+          <input type="text" id="pesquisaNome" placeholder="Digite o nome do produto..." 
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Pesquisar por SKU</label>
+          <input type="text" id="pesquisaSku" placeholder="Digite o SKU..." 
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Filtrar por Categoria</label>
+          <select id="filtroCategoria" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">Todas as categorias</option>
+            <option value="Eletrônicos">Eletrônicos</option>
+            <option value="Móveis">Móveis</option>
+            <option value="Limpeza">Limpeza</option>
+            <option value="Higiene">Higiene</option>
+            <option value="Alimento">Alimento</option>
+            <option value="Bebidas">Bebidas</option>
+            <option value="Congelados">Congelados</option>
+            <option value="Saúde">Saúde</option>
+            <option value="Utilidades">Utilidades</option>
+            <option value="Infantil">Infantil</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-between">
+        <button id="limparFiltros" class="bg-gray-500 hover:bg-gray-600 text-white rounded-lg px-4 py-2">
+          Limpar Filtros
+        </button>
+        <div id="resultadosInfo" class="text-sm text-gray-600"></div>
+      </div>
+    </div>
+
+    <table class="w-full text-left bg-white rounded-xl shadow">
+      <thead>
+        <tr class="border-b">
+          <th class="p-3">Produto</th>
+          <th class="p-3">SKU</th>
+          <th class="p-3">Categoria</th>
+          <th class="p-3">Preço</th>
+          <th class="p-3">Estoque</th>
+          <th class="p-3">Vencimento</th>
+          <th class="p-3">Ações</th>
+        </tr>
+      </thead>
+      <tbody id="listaProdutos"></tbody>
+    </table>
+  </main>
+
+  <!-- Modal Produto (Usado tanto para Cadastro quanto Edição) -->
+  <div id="modalProduto" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white p-6 rounded-xl shadow-lg max-w-md w-full mx-4">
+      <h2 id="modalTitulo" class="text-xl font-semibold mb-4">Cadastrar Novo Produto</h2>
+      
+      <form id="produtoForm" class="space-y-4">
+        <input type="hidden" id="produtoId">
+        <input id="nome" type="text" placeholder="Nome do Produto" class="w-full border p-2 rounded" required>
+        <input id="sku" type="text" placeholder="SKU" class="w-full border p-2 rounded" required>
+        <select id="categoria" class="w-full border p-2 rounded" required>
+          <option value="">Selecione a Categoria</option>
+          <option value="Eletrônicos">Eletrônicos</option>
+          <option value="Móveis">Móveis</option>
+          <option value="Limpeza">Limpeza</option>
+          <option value="Higiene">Higiene</option>
+          <option value="Alimento">Alimento</option>
+          <option value="Bebidas">Bebidas</option>
+          <option value="Congelados">Congelados</option>
+          <option value="Saúde">Saúde</option>
+          <option value="Utilidades">Utilidades</option>
+          <option value="Infantil">Infantil</option>
+        </select>
+        <input id="preco" type="number" step="0.01" placeholder="Preço" class="w-full border p-2 rounded" required>
+        <input id="estoque" type="number" placeholder="Quantidade em estoque" class="w-full border p-2 rounded" required>
+        
+        <!-- Campo de Data de Vencimento (aparece apenas para categorias perecíveis) -->
+        <div id="vencimentoContainer" class="hidden">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Data de Vencimento</label>
+          <input id="dataVencimento" type="date" class="w-full border p-2 rounded">
+        </div>
+
+        <div class="flex justify-between mt-4">
+          <button type="button" id="fecharModal"
+            class="bg-gray-400 hover:bg-gray-500 text-white rounded-xl px-4 py-2">
+            Cancelar
+          </button>
+          <button type="submit" id="submitButton"
+            class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2">
+            Salvar Produto
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script type="module">
+  import { auth, db } from "./firebase.js";
+  import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+  import { collection, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+  const lista = document.getElementById("listaProdutos");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const addProduto = document.getElementById("addProduto");
+  const modalProduto = document.getElementById("modalProduto");
+  const fecharModal = document.getElementById("fecharModal");
+  const produtoForm = document.getElementById("produtoForm");
+  const modalTitulo = document.getElementById("modalTitulo");
+  const submitButton = document.getElementById("submitButton");
+  const pesquisaNome = document.getElementById("pesquisaNome");
+  const pesquisaSku = document.getElementById("pesquisaSku");
+  const filtroCategoria = document.getElementById("filtroCategoria");
+  const limparFiltros = document.getElementById("limparFiltros");
+  const resultadosInfo = document.getElementById("resultadosInfo");
+  const vencimentoContainer = document.getElementById("vencimentoContainer");
+  const categoriaSelect = document.getElementById("categoria");
+  const dataVencimentoInput = document.getElementById("dataVencimento");
+
+  let produtos = [];
+  let editando = false;
+
+  // Categorias que precisam de data de vencimento
+  const categoriasPereciveis = ['Alimento', 'Bebidas', 'Congelados'];
+
+  // Modal functions
+  addProduto.addEventListener("click", () => {
+    abrirModalCadastro();
+  });
+
+  fecharModal.addEventListener("click", () => {
+    fecharModalProduto();
+  });
+
+  // Fechar modal clicando fora
+  modalProduto.addEventListener('click', (e) => {
+    if (e.target === modalProduto) {
+      fecharModalProduto();
+    }
+  });
+
+  // Mostrar/ocultar campo de vencimento baseado na categoria
+  categoriaSelect.addEventListener('change', function() {
+    if (categoriasPereciveis.includes(this.value)) {
+      vencimentoContainer.classList.remove('hidden');
+      dataVencimentoInput.required = true;
+    } else {
+      vencimentoContainer.classList.add('hidden');
+      dataVencimentoInput.required = false;
+      dataVencimentoInput.value = '';
+    }
+  });
+
+  function abrirModalCadastro() {
+    editando = false;
+    modalTitulo.textContent = "Cadastrar Novo Produto";
+    submitButton.textContent = "Salvar Produto";
+    produtoForm.reset();
+    document.getElementById('produtoId').value = '';
+    vencimentoContainer.classList.add('hidden');
+    dataVencimentoInput.required = false;
+    modalProduto.classList.remove('hidden');
+  }
+
+  function abrirModalEditar(produto) {
+    editando = true;
+    modalTitulo.textContent = "Editar Produto";
+    submitButton.textContent = "Atualizar Produto";
+    
+    // Preenche o formulário com os dados atuais
+    document.getElementById('produtoId').value = produto.id;
+    document.getElementById('nome').value = produto.nome;
+    document.getElementById('sku').value = produto.sku;
+    document.getElementById('categoria').value = produto.categoria;
+    document.getElementById('preco').value = produto.preco;
+    document.getElementById('estoque').value = produto.estoque;
+    
+    // Mostrar/ocultar campo de vencimento baseado na categoria
+    if (categoriasPereciveis.includes(produto.categoria)) {
+      vencimentoContainer.classList.remove('hidden');
+      dataVencimentoInput.required = true;
+      if (produto.dataVencimento) {
+        // Formatar a data para o input type="date" (YYYY-MM-DD)
+        const data = new Date(produto.dataVencimento);
+        const dataFormatada = data.toISOString().split('T')[0];
+        document.getElementById('dataVencimento').value = dataFormatada;
+      }
+    } else {
+      vencimentoContainer.classList.add('hidden');
+      dataVencimentoInput.required = false;
+      document.getElementById('dataVencimento').value = '';
+    }
+    
+    modalProduto.classList.remove('hidden');
+  }
+
+  function fecharModalProduto() {
+    modalProduto.classList.add('hidden');
+    produtoForm.reset();
+    document.getElementById('produtoId').value = '';
+    vencimentoContainer.classList.add('hidden');
+    dataVencimentoInput.required = false;
+  }
+
+  // Filtros e pesquisa
+  pesquisaNome.addEventListener('input', filtrarProdutos);
+  pesquisaSku.addEventListener('input', filtrarProdutos);
+  filtroCategoria.addEventListener('change', filtrarProdutos);
+
+  limparFiltros.addEventListener('click', () => {
+    pesquisaNome.value = '';
+    pesquisaSku.value = '';
+    filtroCategoria.value = '';
+    filtrarProdutos();
+  });
+
+  function filtrarProdutos() {
+    const nomeFiltro = pesquisaNome.value.toLowerCase();
+    const skuFiltro = pesquisaSku.value.toLowerCase();
+    const categoriaFiltro = filtroCategoria.value;
+
+    const produtosFiltrados = produtos.filter(produto => {
+      const nomeMatch = produto.nome.toLowerCase().includes(nomeFiltro);
+      const skuMatch = produto.sku.toLowerCase().includes(skuFiltro);
+      const categoriaMatch = !categoriaFiltro || produto.categoria === categoriaFiltro;
+      
+      return nomeMatch && skuMatch && categoriaMatch;
+    });
+
+    exibirProdutos(produtosFiltrados);
+    
+    // Atualizar info de resultados
+    resultadosInfo.textContent = `${produtosFiltrados.length} de ${produtos.length} produtos`;
+  }
+
+  function formatarDataVencimento(dataVencimento) {
+    if (!dataVencimento) return '-';
+    
+    const hoje = new Date();
+    const dataVenc = new Date(dataVencimento);
+    const diffTime = dataVenc - hoje;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    let cor = 'text-gray-600';
+    if (diffDays <= 0) {
+      cor = 'text-red-600 font-bold';
+    } else if (diffDays <= 7) {
+      cor = 'text-red-600';
+    } else if (diffDays <= 30) {
+      cor = 'text-yellow-600';
+    }
+    
+    return `<span class="${cor}">${dataVenc.toLocaleDateString('pt-BR')}</span>`;
+  }
+
+  function exibirProdutos(produtosArray) {
+    lista.innerHTML = "";
+    produtosArray.forEach((produto) => {
+      const statusEstoque = produto.estoque === 0 ? 'text-red-600 font-semibold' : 
+                           produto.estoque <= 5 ? 'text-yellow-600' : 'text-green-600';
+      
+      lista.innerHTML += `
+        <tr class="border-b hover:bg-gray-50">
+          <td class="p-3">${produto.nome}</td>
+          <td class="p-3">${produto.sku}</td>
+          <td class="p-3">
+            <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">
+              ${produto.categoria}
+            </span>
+          </td>
+          <td class="p-3">R$ ${produto.preco.toFixed(2)}</td>
+          <td class="p-3 ${statusEstoque}">
+            ${produto.estoque}
+          </td>
+          <td class="p-3 text-sm">
+            ${formatarDataVencimento(produto.dataVencimento)}
+          </td>
+          <td class="p-3">
+            <button onclick="editarProduto('${produto.id}')" class="bg-yellow-500 hover:bg-yellow-600 text-white rounded px-3 py-1 text-sm mr-2">
+              Editar
+            </button>
+            <button onclick="excluirProduto('${produto.id}')" class="bg-red-500 hover:bg-red-600 text-white rounded px-3 py-1 text-sm">
+              Excluir
+            </button>
+          </td>
+        </tr>`;
+    });
+  }
+
+  logoutBtn.addEventListener("click", () =>
+    signOut(auth).then(() => (window.location = "index.html"))
+  );
+
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) return (window.location = "index.html");
+
+    const produtosRef = collection(db, "produtos");
+    const snapshot = await getDocs(produtosRef);
+
+    produtos = [];
+    snapshot.forEach((docProd) => {
+      produtos.push({
+        id: docProd.id,
+        ...docProd.data()
+      });
+    });
+
+    filtrarProdutos();
+  });
+
+  // Form submission
+  produtoForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const id = document.getElementById("produtoId").value;
+    const nome = document.getElementById("nome").value;
+    const sku = document.getElementById("sku").value;
+    const categoria = document.getElementById("categoria").value;
+    const preco = parseFloat(document.getElementById("preco").value);
+    const estoque = parseInt(document.getElementById("estoque").value);
+    const dataVencimento = document.getElementById("dataVencimento").value;
+
+    // Preparar dados do produto
+    const dadosProduto = {
+      nome, 
+      sku, 
+      categoria, 
+      preco, 
+      estoque,
+      dataCadastro: new Date().toISOString()
+    };
+
+    // Adicionar data de vencimento apenas para categorias perecíveis
+    if (categoriasPereciveis.includes(categoria) && dataVencimento) {
+      dadosProduto.dataVencimento = dataVencimento;
+    } else {
+      // Remover data de vencimento se não for categoria perecível
+      dadosProduto.dataVencimento = null;
+    }
+
+    try {
+      if (editando) {
+        // Editar produto existente
+        await updateDoc(doc(db, "produtos", id), dadosProduto);
+        alert("Produto atualizado com sucesso!");
+      } else {
+        // Cadastrar novo produto
+        await addDoc(collection(db, "produtos"), dadosProduto);
+        alert("Produto cadastrado com sucesso!");
+      }
+      
+      fecharModalProduto();
+      location.reload();
+    } catch (error) {
+      alert("Erro ao salvar produto!");
+      console.error(error);
+    }
+  });
+
+  window.editarProduto = async (id) => {
+    try {
+      const produtoDoc = await getDoc(doc(db, "produtos", id));
+      if (produtoDoc.exists()) {
+        const produtoData = produtoDoc.data();
+        abrirModalEditar({
+          id: id,
+          ...produtoData
+        });
+      } else {
+        alert("Produto não encontrado!");
+      }
+    } catch (error) {
+      alert("Erro ao carregar dados do produto!");
+      console.error(error);
+    }
+  };
+
+  window.excluirProduto = async (id) => {
+    if (confirm("Tem certeza que deseja excluir este produto?")) {
+      try {
+        await deleteDoc(doc(db, "produtos", id));
+        alert("Produto excluído com sucesso!");
+        location.reload();
+      } catch (error) {
+        alert("Erro ao excluir produto!");
+        console.error(error);
+      }
+    }
+  };
+</script>
+
+<style>
+  /* Animações para melhor experiência do usuário */
+  .hover\:scale-105:hover {
+    transform: scale(1.05);
+  }
+  
+  .transition-transform {
+    transition: transform 0.2s ease-in-out;
+  }
+  
+  /* Estilo para linhas com produtos vencidos */
+  .produto-vencido {
+    background-color: #fef2f2;
+  }
+  
+  .produto-alerta {
+    background-color: #fffbeb;
+  }
+</style>
+
+</body>
+</html>

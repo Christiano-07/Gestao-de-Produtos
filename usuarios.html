@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="/firebase.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-white shadow-md p-6">
+    <h2 class="text-xl font-bold mb-8">Gestor de Produtos</h2>
+    <nav class="space-y-2">
+      <a href="dashboard.html" class="block text-gray-600 hover:text-blue-600">Dashboard</a>
+      <a href="produtos.html" class="block text-gray-600 hover:text-blue-600">Produtos</a>
+      <a href="usuarios.html" class="block text-blue-600 font-semibold">Usuários</a>
+      <button id="logoutBtn" class="mt-8 text-red-500 hover:text-red-700">Sair</button>
+    </nav>
+  </aside>
+
+  <!-- Conteúdo principal -->
+  <main class="flex-1 p-8">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-semibold">Usuários</h1>
+      <button id="addUsuario" class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2">
+        + Novo Usuário
+      </button>
+    </div>
+
+    <!-- Filtros e Pesquisa -->
+    <div class="bg-white p-4 rounded-xl shadow mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Pesquisar por Nome</label>
+          <input type="text" id="pesquisaNome" placeholder="Digite o nome..." 
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Pesquisar por Email</label>
+          <input type="text" id="pesquisaEmail" placeholder="Digite o email..." 
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Filtrar por Tipo</label>
+          <select id="filtroTipo" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">Todos os tipos</option>
+            <option value="admin">Administrador</option>
+            <option value="usuario">Usuário</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <table class="w-full text-left bg-white rounded-xl shadow">
+      <thead>
+        <tr class="border-b">
+          <th class="p-3">Nome</th>
+          <th class="p-3">Email</th>
+          <th class="p-3">Tipo</th>
+          <th class="p-3">Ações</th>
+        </tr>
+      </thead>
+      <tbody id="listaUsuarios"></tbody>
+    </table>
+  </main>
+
+  <!-- Modal Usuário (Usado tanto para Cadastro quanto Edição) -->
+  <div id="modalUsuario" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white p-6 rounded-xl shadow-lg max-w-md w-full mx-4">
+      <h2 id="modalTitulo" class="text-xl font-semibold mb-4">Cadastrar Novo Usuário</h2>
+      
+      <form id="usuarioForm" class="space-y-4">
+        <input type="hidden" id="usuarioId">
+        <input id="nome" type="text" placeholder="Nome Completo" class="w-full border p-2 rounded" required>
+        <input id="email" type="email" placeholder="Email" class="w-full border p-2 rounded" required>
+        <input id="senha" type="password" placeholder="Senha" class="w-full border p-2 rounded">
+        <select id="tipo" class="w-full border p-2 rounded" required>
+          <option value="">Selecione o tipo</option>
+          <option value="admin">Administrador</option>
+          <option value="usuario">Usuário</option>
+        </select>
+
+        <div class="flex justify-between mt-4">
+          <button type="button" id="fecharModal"
+            class="bg-gray-400 hover:bg-gray-500 text-white rounded-xl px-4 py-2">
+            Cancelar
+          </button>
+          <button type="submit" id="submitButton"
+            class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2">
+            Salvar Usuário
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script type="module">
+  import { auth, db } from "./firebase.js";
+  import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+  import { collection, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+  import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+
+  const lista = document.getElementById("listaUsuarios");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const addUsuario = document.getElementById("addUsuario");
+  const modalUsuario = document.getElementById("modalUsuario");
+  const fecharModal = document.getElementById("fecharModal");
+  const usuarioForm = document.getElementById("usuarioForm");
+  const modalTitulo = document.getElementById("modalTitulo");
+  const submitButton = document.getElementById("submitButton");
+  const pesquisaNome = document.getElementById("pesquisaNome");
+  const pesquisaEmail = document.getElementById("pesquisaEmail");
+  const filtroTipo = document.getElementById("filtroTipo");
+
+  let usuarios = [];
+  let editando = false;
+
+  // Modal functions
+  addUsuario.addEventListener("click", () => {
+    abrirModalCadastro();
+  });
+
+  fecharModal.addEventListener("click", () => {
+    fecharModalUsuario();
+  });
+
+  // Fechar modal clicando fora
+  modalUsuario.addEventListener('click', (e) => {
+    if (e.target === modalUsuario) {
+      fecharModalUsuario();
+    }
+  });
+
+  function abrirModalCadastro() {
+    editando = false;
+    modalTitulo.textContent = "Cadastrar Novo Usuário";
+    submitButton.textContent = "Salvar Usuário";
+    document.getElementById('senha').placeholder = "Senha";
+    document.getElementById('senha').required = true;
+    usuarioForm.reset();
+    document.getElementById('usuarioId').value = '';
+    modalUsuario.classList.remove('hidden');
+  }
+
+  function abrirModalEditar(usuario) {
+    editando = true;
+    modalTitulo.textContent = "Editar Usuário";
+    submitButton.textContent = "Atualizar Usuário";
+    document.getElementById('senha').placeholder = "Nova Senha (deixe em branco para manter)";
+    document.getElementById('senha').required = false;
+    
+    // Preenche o formulário com os dados atuais
+    document.getElementById('usuarioId').value = usuario.id;
+    document.getElementById('nome').value = usuario.nome;
+    document.getElementById('email').value = usuario.email;
+    document.getElementById('tipo').value = usuario.tipo;
+    document.getElementById('senha').value = '';
+    
+    modalUsuario.classList.remove('hidden');
+  }
+
+  function fecharModalUsuario() {
+    modalUsuario.classList.add('hidden');
+    usuarioForm.reset();
+    document.getElementById('usuarioId').value = '';
+  }
+
+  // Filtros e pesquisa
+  pesquisaNome.addEventListener('input', filtrarUsuarios);
+  pesquisaEmail.addEventListener('input', filtrarUsuarios);
+  filtroTipo.addEventListener('change', filtrarUsuarios);
+
+  function filtrarUsuarios() {
+    const nomeFiltro = pesquisaNome.value.toLowerCase();
+    const emailFiltro = pesquisaEmail.value.toLowerCase();
+    const tipoFiltro = filtroTipo.value;
+
+    const usuariosFiltrados = usuarios.filter(usuario => {
+      const nomeMatch = usuario.nome.toLowerCase().includes(nomeFiltro);
+      const emailMatch = usuario.email.toLowerCase().includes(emailFiltro);
+      const tipoMatch = !tipoFiltro || usuario.tipo === tipoFiltro;
+      
+      return nomeMatch && emailMatch && tipoMatch;
+    });
+
+    exibirUsuarios(usuariosFiltrados);
+  }
+
+  function exibirUsuarios(usuariosArray) {
+    lista.innerHTML = "";
+    usuariosArray.forEach((usuario) => {
+      const tipoBadge = usuario.tipo === 'admin' 
+        ? 'bg-red-100 text-red-800'
+        : 'bg-green-100 text-green-800';
+        
+      lista.innerHTML += `
+        <tr class="border-b hover:bg-gray-50">
+          <td class="p-3">${usuario.nome}</td>
+          <td class="p-3">${usuario.email}</td>
+          <td class="p-3">
+            <span class="${tipoBadge} text-xs font-medium px-2.5 py-0.5 rounded">
+              ${usuario.tipo}
+            </span>
+          </td>
+          <td class="p-3">
+            <button onclick="editarUsuario('${usuario.id}')" class="bg-yellow-500 hover:bg-yellow-600 text-white rounded px-3 py-1 text-sm mr-2">
+              Editar
+            </button>
+            <button onclick="excluirUsuario('${usuario.id}')" class="bg-red-500 hover:bg-red-600 text-white rounded px-3 py-1 text-sm">
+              Excluir
+            </button>
+          </td>
+        </tr>`;
+    });
+  }
+
+  logoutBtn.addEventListener("click", () =>
+    signOut(auth).then(() => (window.location = "index.html"))
+  );
+
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) return (window.location = "index.html");
+
+    const usuariosRef = collection(db, "usuarios");
+    const snapshot = await getDocs(usuariosRef);
+
+    usuarios = [];
+    snapshot.forEach((docUser) => {
+      usuarios.push({
+        id: docUser.id,
+        ...docUser.data()
+      });
+    });
+
+    filtrarUsuarios();
+  });
+
+  // Form submission
+  usuarioForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const id = document.getElementById("usuarioId").value;
+    const nome = document.getElementById("nome").value;
+    const email = document.getElementById("email").value;
+    const senha = document.getElementById("senha").value;
+    const tipo = document.getElementById("tipo").value;
+
+    try {
+      if (editando) {
+        // Editar usuário existente
+        await updateDoc(doc(db, "usuarios", id), {
+          nome, email, tipo
+        });
+        alert("Usuário atualizado com sucesso!");
+      } else {
+        // Cadastrar novo usuário
+        const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
+        
+        await addDoc(collection(db, "usuarios"), {
+          nome,
+          email,
+          tipo,
+          uid: userCredential.user.uid
+        });
+        alert("Usuário cadastrado com sucesso!");
+      }
+      
+      fecharModalUsuario();
+      location.reload();
+    } catch (error) {
+      alert("Erro ao salvar usuário: " + error.message);
+      console.error(error);
+    }
+  });
+
+  window.editarUsuario = async (id) => {
+    try {
+      const userDoc = await getDoc(doc(db, "usuarios", id));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        abrirModalEditar({
+          id: id,
+          ...userData
+        });
+      } else {
+        alert("Usuário não encontrado!");
+      }
+    } catch (error) {
+      alert("Erro ao carregar dados do usuário!");
+      console.error(error);
+    }
+  };
+
+  window.excluirUsuario = async (id) => {
+    if (confirm("Tem certeza que deseja excluir este usuário?")) {
+      try {
+        await deleteDoc(doc(db, "usuarios", id));
+        alert("Usuário excluído com sucesso!");
+        location.reload();
+      } catch (error) {
+        alert("Erro ao excluir usuário!");
+        console.error(error);
+      }
+    }
+  };
+</script>
+</body>
+</html>

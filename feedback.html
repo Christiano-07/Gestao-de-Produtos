@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-50 min-h-screen flex">
+
+  <!-- Sidebar igual à do dashboard -->
+  <aside class="w-64 bg-white shadow-md p-6">
+    <h2 class="text-xl font-bold mb-8">Gestor de Produtos</h2>
+
+    <nav class="space-y-2">
+      <a href="dashboard.html" class="block text-gray-600 hover:text-blue-600">Dashboard</a>
+      <a href="produtos.html" class="block text-gray-600 hover:text-blue-600">Produtos</a>
+      <a href="usuarios.html" class="block text-gray-600 hover:text-blue-600">Usuários</a>
+      <a href="feedbacks.html" class="block text-blue-600 font-semibold">Feedbacks</a>
+
+      <button id="logoutBtn" class="mt-8 text-red-500 hover:text-red-700">Sair</button>
+    </nav>
+  </aside>
+
+  <!-- Conteúdo -->
+  <main class="flex-1 p-8">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-semibold">Feedbacks Recebidos</h1>
+    </div>
+
+    <!-- Lista -->
+    <div id="listaFeedbacks" class="space-y-4"></div>
+
+    <!-- Caso não haja feedbacks -->
+    <p id="nenhumFb" class="text-gray-500"></p>
+  </main>
+
+  <script type="module">
+    import { auth } from "./firebase.js";
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+
+    // Evitar acesso sem login
+    onAuthStateChanged(auth, (user) => {
+      if (!user) window.location.href = "index.html";
+    });
+
+    // Logout
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      signOut(auth).then(() => (window.location = "index.html"));
+    });
+
+    // Ler feedbacks
+    const listaDiv = document.getElementById("listaFeedbacks");
+    const nenhumFb = document.getElementById("nenhumFb");
+
+    const feedbacks = JSON.parse(localStorage.getItem("feedbacks")) || [];
+
+    if (feedbacks.length === 0) {
+      nenhumFb.textContent = "Nenhum feedback recebido ainda.";
+    } else {
+      nenhumFb.textContent = "";
+    }
+
+    feedbacks.forEach((f, index) => {
+      const card = document.createElement("div");
+
+      card.className = "p-4 bg-white rounded-xl shadow border border-gray-200";
+
+      card.innerHTML = `
+        <div class="flex justify-between">
+          <h3 class="font-semibold text-lg">${f.nome}</h3>
+          <span class="text-sm text-gray-500">${f.data}</span>
+        </div>
+
+        <p class="mt-2 text-gray-700 whitespace-pre-line">${f.texto}</p>
+
+        <button data-index="${index}" 
+          class="mt-3 text-sm text-red-600 hover:text-red-800 removerFb">
+          Remover
+        </button>
+      `;
+
+      listaDiv.appendChild(card);
+    });
+
+    // Remover feedback individual
+    document.addEventListener("click", (e) => {
+      if (e.target.classList.contains("removerFb")) {
+        const index = e.target.getAttribute("data-index");
+
+        feedbacks.splice(index, 1); // remove
+        localStorage.setItem("feedbacks", JSON.stringify(feedbacks));
+
+        location.reload(); // atualiza página
+      }
+    });
+  </script>
+
+</body>
+</html>
