@@ -57,60 +57,97 @@
   </main>
 
   <script type="module">
-    import { auth, db } from "./firebase.js";
-    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-    import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { auth, db } from "./firebase.js";
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-    const form = document.getElementById("produtoForm");
-    const voltar = document.getElementById("voltar");
-    const logoutBtn = document.getElementById("logoutBtn");
+const form = document.getElementById("produtoForm");
+const voltar = document.getElementById("voltar");
+const logoutBtn = document.getElementById("logoutBtn");
+const regexNome = /^[A-Za-zÀ-ÖØ-öø-ÿ ]+$/u;
+const sanitize = s => String(s||"").replace(/<[^>]*>?/gm, '').trim();
 
-    voltar.addEventListener("click", () => (window.location.href = "produtos.html"));
-    logoutBtn.addEventListener("click", () => signOut(auth).then(() => (window.location = "index.html")));
+/* Auth */
+if (typeof onAuthStateChanged === "function") {
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) return window.location = "index.html";
 
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) window.location = "index.html";
+    // carregar produto via query param id
+    const params = new URLSearchParams(window.location.search);
+    const produtoId = params.get("id");
+    if (!produtoId) return; // nada a fazer
 
-      // Carrega os dados do produto
-      const urlParams = new URLSearchParams(window.location.search);
-      const produtoId = urlParams.get('id');
-      
-      if (produtoId) {
-        const produtoDoc = await getDoc(doc(db, "produtos", produtoId));
-        if (produtoDoc.exists()) {
-          const produtoData = produtoDoc.data();
-          document.getElementById('nome').value = produtoData.nome;
-          document.getElementById('sku').value = produtoData.sku;
-          document.getElementById('categoria').value = produtoData.categoria;
-          document.getElementById('preco').value = produtoData.preco;
-          document.getElementById('estoque').value = produtoData.estoque;
-        }
+    try {
+      const snap = await getDoc(doc(db, "produtos", produtoId));
+      if (snap.exists()) {
+        const p = snap.data();
+        document.getElementById("nome").value = p.nome ?? "";
+        document.getElementById("sku").value = p.sku ?? "";
+        document.getElementById("categoria").value = p.categoria ?? "";
+        document.getElementById("preco").value = p.preco ?? "";
+        document.getElementById("estoque").value = p.estoque ?? "";
+      } else {
+        alert("Produto não encontrado.");
       }
-    });
+    } catch (err) {
+      console.error(err); alert("Erro ao carregar produto.");
+    }
+  });
+}
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
+/* Logout / voltar */
+if (voltar) voltar.addEventListener("click", () => window.location.href = "produtos.html");
+if (logoutBtn) logoutBtn.addEventListener("click", () => signOut(auth).then(() => (window.location = "index.html")));
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const produtoId = urlParams.get('id');
+/* submit */
+if (form) {
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const params = new URLSearchParams(window.location.search);
+    const produtoId = params.get("id");
+    if (!produtoId) { alert("ID do produto ausente."); return; }
 
-      const nome = document.getElementById("nome").value;
-      const sku = document.getElementById("sku").value;
-      const categoria = document.getElementById("categoria").value;
-      const preco = parseFloat(document.getElementById("preco").value);
-      const estoque = parseInt(document.getElementById("estoque").value);
+    const rawNome = document.getElementById("nome")?.value ?? "";
+    const rawSku = document.getElementById("sku")?.value ?? "";
+    const rawCategoria = document.getElementById("categoria")?.value ?? "";
+    const rawPreco = document.getElementById("preco")?.value ?? "";
+    const rawEstoque = document.getElementById("estoque")?.value ?? "";
 
-      try {
-        await updateDoc(doc(db, "produtos", produtoId), {
-          nome, sku, categoria, preco, estoque
-        });
-        alert("Produto atualizado com sucesso!");
-        window.location.href = "produtos.html";
-      } catch (error) {
-        alert("Erro ao atualizar produto!");
-        console.error(error);
-      }
-    });
-  </script>
-</body>
-</html>
+    const nome = sanitize(rawNome);
+    if (!nome || nome.length < 3) { alert("Nome obrigatório (mín. 3 caracteres)."); return; }
+    if (nome.length > 50) { alert("Nome muito longo."); return; }
+    if (!regexNome.test(nome)) { alert("Nome inválido. Use apenas letras e espaços."); return; }
+
+    const sku = sanitize(rawSku);
+    if (!sku || sku.length > 30) { alert("SKU inválido."); return; }
+
+    const categoria = sanitize(rawCategoria);
+    if (!categoria) { alert("Categoria inválida."); return; }
+
+    const precoNum = Number(String(rawPreco).replace(",", "."));
+    if (String(rawPreco).trim() === "" || Number.isNaN(precoNum)) { alert("Preço inválido."); return; }
+    if (precoNum < 0) { alert("Preço não pode ser negativo."); return; }
+    if (String(rawPreco).length > 12) { alert("Preço muito longo."); return; }
+
+    const estoqueNum = Number(String(rawEstoque).trim());
+    if (!Number.isInteger(estoqueNum) || estoqueNum < 0) { alert("Quantidade inválida (inteiro ≥ 0)."); return; }
+    if (String(Math.abs(estoqueNum)).length > 7) { alert("Quantidade muito longa."); return; }
+
+    try {
+      await updateDoc(doc(db, "produtos", produtoId), {
+        nome,
+        sku,
+        categoria,
+        preco: Number(precoNum.toFixed(2)),
+        estoque: estoqueNum
+      });
+      alert("Produto atualizado com sucesso!");
+      window.location.href = "produtos.html";
+    } catch (err) {
+      console.error(err); alert("Erro ao atualizar produto.");
+    }
+  });
+
+  document.querySelectorAll('input[type="number"]').forEach(i => i.addEventListener('wheel', e => e.target.blur()));
+}
+</script>

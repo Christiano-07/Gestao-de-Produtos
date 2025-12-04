@@ -94,215 +94,180 @@
     </div>
   </div>
 
-<script type="module">
-  import { auth, db } from "./firebase.js";
-  import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-  import { collection, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-  import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+  <script type="module">
+import { auth, db } from "./firebase.js";
+import { onAuthStateChanged, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+import { collection, getDocs, deleteDoc, doc, addDoc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-  const lista = document.getElementById("listaUsuarios");
-  const logoutBtn = document.getElementById("logoutBtn");
-  const addUsuario = document.getElementById("addUsuario");
-  const modalUsuario = document.getElementById("modalUsuario");
-  const fecharModal = document.getElementById("fecharModal");
-  const usuarioForm = document.getElementById("usuarioForm");
-  const modalTitulo = document.getElementById("modalTitulo");
-  const submitButton = document.getElementById("submitButton");
-  const pesquisaNome = document.getElementById("pesquisaNome");
-  const pesquisaEmail = document.getElementById("pesquisaEmail");
-  const filtroTipo = document.getElementById("filtroTipo");
+const lista = document.getElementById("listaUsuarios");
+const logoutBtn = document.getElementById("logoutBtn");
+const addUsuario = document.getElementById("addUsuario");
+const modalUsuario = document.getElementById("modalUsuario");
+const fecharModal = document.getElementById("fecharModal");
+const usuarioForm = document.getElementById("usuarioForm");
+const modalTitulo = document.getElementById("modalTitulo");
+const submitButton = document.getElementById("submitButton");
+const pesquisaNome = document.getElementById("pesquisaNome");
+const pesquisaEmail = document.getElementById("pesquisaEmail");
+const filtroTipo = document.getElementById("filtroTipo");
+const regexNome = /^[A-Za-zÀ-ÖØ-öø-ÿ ]+$/u;
+const sanitize = s => String(s||"").replace(/<[^>]*>?/gm, '').trim();
 
-  let usuarios = [];
-  let editando = false;
+let usuarios = [];
+let editando = false;
 
-  // Modal functions
-  addUsuario.addEventListener("click", () => {
-    abrirModalCadastro();
-  });
-
-  fecharModal.addEventListener("click", () => {
-    fecharModalUsuario();
-  });
-
-  // Fechar modal clicando fora
-  modalUsuario.addEventListener('click', (e) => {
-    if (e.target === modalUsuario) {
-      fecharModalUsuario();
-    }
-  });
-
-  function abrirModalCadastro() {
-    editando = false;
-    modalTitulo.textContent = "Cadastrar Novo Usuário";
-    submitButton.textContent = "Salvar Usuário";
-    document.getElementById('senha').placeholder = "Senha";
-    document.getElementById('senha').required = true;
-    usuarioForm.reset();
-    document.getElementById('usuarioId').value = '';
-    modalUsuario.classList.remove('hidden');
-  }
-
-  function abrirModalEditar(usuario) {
-    editando = true;
-    modalTitulo.textContent = "Editar Usuário";
-    submitButton.textContent = "Atualizar Usuário";
-    document.getElementById('senha').placeholder = "Nova Senha (deixe em branco para manter)";
-    document.getElementById('senha').required = false;
-    
-    // Preenche o formulário com os dados atuais
-    document.getElementById('usuarioId').value = usuario.id;
-    document.getElementById('nome').value = usuario.nome;
-    document.getElementById('email').value = usuario.email;
-    document.getElementById('tipo').value = usuario.tipo;
-    document.getElementById('senha').value = '';
-    
-    modalUsuario.classList.remove('hidden');
-  }
-
-  function fecharModalUsuario() {
-    modalUsuario.classList.add('hidden');
-    usuarioForm.reset();
-    document.getElementById('usuarioId').value = '';
-  }
-
-  // Filtros e pesquisa
-  pesquisaNome.addEventListener('input', filtrarUsuarios);
-  pesquisaEmail.addEventListener('input', filtrarUsuarios);
-  filtroTipo.addEventListener('change', filtrarUsuarios);
-
-  function filtrarUsuarios() {
-    const nomeFiltro = pesquisaNome.value.toLowerCase();
-    const emailFiltro = pesquisaEmail.value.toLowerCase();
-    const tipoFiltro = filtroTipo.value;
-
-    const usuariosFiltrados = usuarios.filter(usuario => {
-      const nomeMatch = usuario.nome.toLowerCase().includes(nomeFiltro);
-      const emailMatch = usuario.email.toLowerCase().includes(emailFiltro);
-      const tipoMatch = !tipoFiltro || usuario.tipo === tipoFiltro;
-      
-      return nomeMatch && emailMatch && tipoMatch;
-    });
-
-    exibirUsuarios(usuariosFiltrados);
-  }
-
-  function exibirUsuarios(usuariosArray) {
-    lista.innerHTML = "";
-    usuariosArray.forEach((usuario) => {
-      const tipoBadge = usuario.tipo === 'admin' 
-        ? 'bg-red-100 text-red-800'
-        : 'bg-green-100 text-green-800';
-        
-      lista.innerHTML += `
-        <tr class="border-b hover:bg-gray-50">
-          <td class="p-3">${usuario.nome}</td>
-          <td class="p-3">${usuario.email}</td>
-          <td class="p-3">
-            <span class="${tipoBadge} text-xs font-medium px-2.5 py-0.5 rounded">
-              ${usuario.tipo}
-            </span>
-          </td>
-          <td class="p-3">
-            <button onclick="editarUsuario('${usuario.id}')" class="bg-yellow-500 hover:bg-yellow-600 text-white rounded px-3 py-1 text-sm mr-2">
-              Editar
-            </button>
-            <button onclick="excluirUsuario('${usuario.id}')" class="bg-red-500 hover:bg-red-600 text-white rounded px-3 py-1 text-sm">
-              Excluir
-            </button>
-          </td>
-        </tr>`;
-    });
-  }
-
-  logoutBtn.addEventListener("click", () =>
-    signOut(auth).then(() => (window.location = "index.html"))
-  );
-
+if (typeof onAuthStateChanged === "function") {
   onAuthStateChanged(auth, async (user) => {
     if (!user) return (window.location = "index.html");
+    await carregarUsuarios();
+  });
+}
 
-    const usuariosRef = collection(db, "usuarios");
-    const snapshot = await getDocs(usuariosRef);
+if (logoutBtn) logoutBtn.addEventListener("click", () => signOut(auth).then(()=> (window.location = "index.html")));
+if (addUsuario) addUsuario.addEventListener("click", abrirModalCadastro);
+if (fecharModal) fecharModal.addEventListener("click", fecharModalUsuario);
+if (modalUsuario) modalUsuario.addEventListener("click", (e)=> { if (e.target === modalUsuario) fecharModalUsuario(); });
 
-    usuarios = [];
-    snapshot.forEach((docUser) => {
-      usuarios.push({
-        id: docUser.id,
-        ...docUser.data()
-      });
-    });
+function abrirModalCadastro() {
+  editando = false;
+  modalTitulo.textContent = "Cadastrar Novo Usuário";
+  submitButton.textContent = "Salvar Usuário";
+  document.getElementById('senha').placeholder = "Senha";
+  document.getElementById('senha').required = true;
+  usuarioForm.reset();
+  document.getElementById('usuarioId').value = '';
+  modalUsuario.classList.remove('hidden');
+}
 
-    filtrarUsuarios();
+function abrirModalEditar(usuario) {
+  editando = true;
+  modalTitulo.textContent = "Editar Usuário";
+  submitButton.textContent = "Atualizar Usuário";
+  document.getElementById('senha').placeholder = "Nova Senha (deixe em branco para manter)";
+  document.getElementById('senha').required = false;
+  document.getElementById('usuarioId').value = usuario.id;
+  document.getElementById('nome').value = usuario.nome;
+  document.getElementById('email').value = usuario.email;
+  document.getElementById('tipo').value = usuario.tipo;
+  document.getElementById('senha').value = '';
+  modalUsuario.classList.remove('hidden');
+}
+
+function fecharModalUsuario() {
+  modalUsuario.classList.add('hidden');
+  usuarioForm.reset();
+  document.getElementById('usuarioId').value = '';
+}
+
+async function carregarUsuarios() {
+  usuarios = [];
+  lista.innerHTML = "";
+  try {
+    const snap = await getDocs(collection(db, "usuarios"));
+    snap.forEach(d => usuarios.push({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.error(err); alert("Erro ao carregar usuários.");
+    return;
+  }
+  filtrarUsuarios();
+}
+
+function exibirUsuarios(usuariosArray) {
+  lista.innerHTML = "";
+  if (!usuariosArray.length) {
+    lista.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-500">Nenhum usuário encontrado.</td></tr>`;
+    return;
+  }
+  usuariosArray.forEach(usuario => {
+    const tipoBadge = usuario.tipo === 'admin' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800';
+    lista.innerHTML += `
+      <tr class="border-b hover:bg-gray-50">
+        <td class="p-3">${usuario.nome}</td>
+        <td class="p-3">${usuario.email}</td>
+        <td class="p-3"><span class="${tipoBadge} text-xs font-medium px-2.5 py-0.5 rounded">${usuario.tipo}</span></td>
+        <td class="p-3">
+          <button onclick="window.__editarUsuario('${usuario.id}')" class="bg-yellow-500 hover:bg-yellow-600 text-white rounded px-3 py-1 text-sm mr-2">Editar</button>
+          <button onclick="window.__excluirUsuario('${usuario.id}')" class="bg-red-500 hover:bg-red-600 text-white rounded px-3 py-1 text-sm">Excluir</button>
+        </td>
+      </tr>`;
+  });
+}
+
+/* filter */
+function filtrarUsuarios() {
+  const nomeFiltro = (pesquisaNome?.value || "").toLowerCase();
+  const emailFiltro = (pesquisaEmail?.value || "").toLowerCase();
+  const tipoFiltro = filtroTipo?.value || "";
+
+  const usuariosFiltrados = usuarios.filter(u => {
+    const nomeMatch = (u.nome || "").toLowerCase().includes(nomeFiltro);
+    const emailMatch = (u.email || "").toLowerCase().includes(emailFiltro);
+    const tipoMatch = !tipoFiltro || u.tipo === tipoFiltro;
+    return nomeMatch && emailMatch && tipoMatch;
   });
 
-  // Form submission
+  exibirUsuarios(usuariosFiltrados);
+}
+
+if (pesquisaNome) pesquisaNome.addEventListener("input", filtrarUsuarios);
+if (pesquisaEmail) pesquisaEmail.addEventListener("input", filtrarUsuarios);
+if (filtroTipo) filtroTipo.addEventListener("change", filtrarUsuarios);
+
+/* form submit (create or update) */
+if (usuarioForm) {
   usuarioForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-
     const id = document.getElementById("usuarioId").value;
-    const nome = document.getElementById("nome").value;
+    const rawNome = document.getElementById("nome").value;
     const email = document.getElementById("email").value;
     const senha = document.getElementById("senha").value;
     const tipo = document.getElementById("tipo").value;
 
+    const nome = sanitize(rawNome);
+    if (!nome || nome.length < 3) { alert("Nome obrigatório (mín. 3 caracteres)."); return; }
+    if (nome.length > 50) { alert("Nome muito longo."); return; }
+    if (!regexNome.test(nome)) { alert("Nome inválido. Use apenas letras e espaços."); return; }
+
     try {
-      if (editando) {
-        // Editar usuário existente
-        await updateDoc(doc(db, "usuarios", id), {
-          nome, email, tipo
-        });
+      if (editando && id) {
+        // update
+        await updateDoc(doc(db, "usuarios", id), { nome, tipo });
         alert("Usuário atualizado com sucesso!");
       } else {
-        // Cadastrar novo usuário
-        const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
-        
-        await addDoc(collection(db, "usuarios"), {
-          nome,
-          email,
-          tipo,
-          uid: userCredential.user.uid
-        });
+        // create user in auth and store in firestore
+        if (!senha || senha.length < 6) { alert("Senha mínima: 6 caracteres."); return; }
+        const userCred = await createUserWithEmailAndPassword(auth, email, senha);
+        await addDoc(collection(db, "usuarios"), { uid: userCred.user.uid, nome, email, tipo });
         alert("Usuário cadastrado com sucesso!");
       }
-      
       fecharModalUsuario();
-      location.reload();
-    } catch (error) {
-      alert("Erro ao salvar usuário: " + error.message);
-      console.error(error);
+      carregarUsuarios();
+    } catch (err) {
+      console.error(err); alert("Erro ao salvar usuário: " + (err.message || err));
     }
   });
+}
 
-  window.editarUsuario = async (id) => {
-    try {
-      const userDoc = await getDoc(doc(db, "usuarios", id));
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        abrirModalEditar({
-          id: id,
-          ...userData
-        });
-      } else {
-        alert("Usuário não encontrado!");
-      }
-    } catch (error) {
-      alert("Erro ao carregar dados do usuário!");
-      console.error(error);
-    }
-  };
+/* expose small helpers for edit/excluir buttons (global for onclick attributes) */
+window.__editarUsuario = async function(id) {
+  try {
+    const snap = await getDoc(doc(db, "usuarios", id));
+    if (!snap.exists()) { alert("Usuário não encontrado."); return; }
+    const u = { id: snap.id, ...snap.data() };
+    abrirModalEditar(u);
+  } catch (err) {
+    console.error(err); alert("Erro ao carregar usuário.");
+  }
+};
 
-  window.excluirUsuario = async (id) => {
-    if (confirm("Tem certeza que deseja excluir este usuário?")) {
-      try {
-        await deleteDoc(doc(db, "usuarios", id));
-        alert("Usuário excluído com sucesso!");
-        location.reload();
-      } catch (error) {
-        alert("Erro ao excluir usuário!");
-        console.error(error);
-      }
-    }
-  };
+window.__excluirUsuario = async function(id) {
+  if (!confirm("Deseja realmente excluir este usuário?")) return;
+  try {
+    await deleteDoc(doc(db, "usuarios", id));
+    alert("Usuário excluído com sucesso!");
+    carregarUsuarios();
+  } catch (err) {
+    console.error(err); alert("Erro ao excluir usuário.");
+  }
+};
 </script>
-</body>
-</html>
