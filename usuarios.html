@@ -193,7 +193,7 @@ function exibirUsuarios(usuariosArray) {
   });
 }
 
-/* filter */
+/*  FILTRO DE USUÁRIOS  */
 function filtrarUsuarios() {
   const nomeFiltro = (pesquisaNome?.value || "").toLowerCase();
   const emailFiltro = (pesquisaEmail?.value || "").toLowerCase();
@@ -213,7 +213,7 @@ if (pesquisaNome) pesquisaNome.addEventListener("input", filtrarUsuarios);
 if (pesquisaEmail) pesquisaEmail.addEventListener("input", filtrarUsuarios);
 if (filtroTipo) filtroTipo.addEventListener("change", filtrarUsuarios);
 
-/* form submit (create or update) */
+/*  SALVAR (CRIAR / ATUALIZAR)  */
 if (usuarioForm) {
   usuarioForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -223,6 +223,7 @@ if (usuarioForm) {
     const senha = document.getElementById("senha").value;
     const tipo = document.getElementById("tipo").value;
 
+    /* Validações básicas */
     const nome = sanitize(rawNome);
     if (!nome || nome.length < 3) { alert("Nome obrigatório (mín. 3 caracteres)."); return; }
     if (nome.length > 50) { alert("Nome muito longo."); return; }
@@ -230,11 +231,11 @@ if (usuarioForm) {
 
     try {
       if (editando && id) {
-        // update
+      /* Atualizar usuário existente */
         await updateDoc(doc(db, "usuarios", id), { nome, tipo });
         alert("Usuário atualizado com sucesso!");
       } else {
-        // create user in auth and store in firestore
+        /* Criar novo usuário no Auth + Firestore */
         if (!senha || senha.length < 6) { alert("Senha mínima: 6 caracteres."); return; }
         const userCred = await createUserWithEmailAndPassword(auth, email, senha);
         await addDoc(collection(db, "usuarios"), { uid: userCred.user.uid, nome, email, tipo });
@@ -248,7 +249,7 @@ if (usuarioForm) {
   });
 }
 
-/* expose small helpers for edit/excluir buttons (global for onclick attributes) */
+/*  Funções globais (EDITAR / EXCLUIR) */
 window.__editarUsuario = async function(id) {
   try {
     const snap = await getDoc(doc(db, "usuarios", id));

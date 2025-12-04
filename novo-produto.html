@@ -48,11 +48,11 @@ import { auth, db } from "./firebase.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 import { collection, addDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-/* Helpers */
+/* Auxiliares */
 const sanitize = (s) => String(s || "").replace(/<[^>]*>?/gm, "").trim();
 const regexNome = /^[A-Za-zÀ-ÖØ-öø-ÿ ]+$/u;
 
-/* Elements (check existence before using) */
+/* Elementos (verificar existência antes de usar) */
 const form = document.getElementById("produtoForm");
 const voltar = document.getElementById("voltar");
 const logoutBtn = document.getElementById("logoutBtn");
@@ -65,14 +65,14 @@ const fbNome = document.getElementById("fb_nome");
 const fbTexto = document.getElementById("fb_texto");
 const msgFb = document.getElementById("msgFb");
 
-/* Auth protection */
+/* Proteção de autenticação */
 if (typeof onAuthStateChanged === "function" && auth) {
   onAuthStateChanged(auth, (user) => {
     if (!user) window.location = "index.html";
   });
 }
 
-/* Logout */
+/*  Encerrar sessão */
 if (logoutBtn) {
   logoutBtn.addEventListener("click", () => {
     try { signOut(auth).then(() => (window.location = "index.html")); }
@@ -83,63 +83,36 @@ if (logoutBtn) {
 /* Voltar */
 if (voltar) voltar.addEventListener("click", () => (window.location.href = "produtos.html"));
 
-/* Feedback modal handlers (safe: only if elements exist) */
-if (openFeedback && modalFeedback && closeFeedback && sendFeedback && fbTexto && msgFb) {
-  openFeedback.addEventListener("click", () => {
-    modalFeedback.classList.remove("hidden");
-    msgFb.textContent = "";
-    fbNome.value = "";
-    fbTexto.value = "";
-  });
-  closeFeedback.addEventListener("click", () => modalFeedback.classList.add("hidden"));
-  modalFeedback.addEventListener("click", (e) => { if (e.target === modalFeedback) modalFeedback.classList.add("hidden"); });
 
-  sendFeedback.addEventListener("click", () => {
-    const nome = sanitize(fbNome.value) || "Anônimo";
-    const texto = sanitize(fbTexto.value || "");
-    if (!texto || texto.length < 5) {
-      msgFb.textContent = "Escreva um feedback com pelo menos 5 caracteres.";
-      msgFb.classList.remove("text-green-600"); msgFb.classList.add("text-red-600");
-      return;
-    }
-    const arr = JSON.parse(localStorage.getItem("feedbacks") || "[]");
-    arr.unshift({ nome, texto, data: new Date().toISOString() });
-    localStorage.setItem("feedbacks", JSON.stringify(arr));
-    msgFb.textContent = "Feedback enviado!";
-    msgFb.classList.remove("text-red-600"); msgFb.classList.add("text-green-600");
-    setTimeout(() => modalFeedback.classList.add("hidden"), 700);
-  });
-}
-
-/* FORM validation & submit */
+/* Validação e envio do formulário */
 if (form) {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    // read raw values
+    // ler valores brutos
     const rawNome = document.getElementById("nome")?.value ?? "";
     const rawSku = document.getElementById("sku")?.value ?? "";
     const rawCategoria = document.getElementById("categoria")?.value ?? "";
     const rawPreco = document.getElementById("preco")?.value ?? "";
     const rawEstoque = document.getElementById("estoque")?.value ?? "";
 
-    // sanitize textual fields
+    // sanitizar campos de texto
     const nome = sanitize(rawNome);
     const sku = sanitize(rawSku);
     const categoria = sanitize(rawCategoria);
 
-    // basic name validation
+    // validação básica do nome
     if (!nome || nome.length < 3) { alert("Nome obrigatório (mín. 3 caracteres)."); return; }
     if (nome.length > 50) { alert("Nome muito longo (máx. 50 caracteres)."); return; }
     if (!regexNome.test(nome)) { alert("Nome inválido. Use apenas letras e espaços."); return; }
 
-    // SKU validation
+    // validação do SKU
     if (!sku || sku.length > 30) { alert("SKU inválido. Obrigatório e até 30 caracteres."); return; }
 
-    // categoria check
+    // verificação da categoria
     if (!categoria) { alert("Categoria inválida."); return; }
 
-    // price validation — accept ',' or '.'
+    // validação do preço — aceita ',' ou '.'
     let precoNum = null;
     if (rawPreco === "" || rawPreco === null) { alert("Informe o preço."); return; }
     const precoStr = String(rawPreco).trim();
@@ -149,14 +122,14 @@ if (form) {
     if (precoNum < 0) { alert("Preço não pode ser negativo."); return; }
     if (precoStr.length > 12) { alert("Preço muito longo."); return; }
 
-    // estoque validation (inteiro)
+    // validação do estoque (inteiro)
     if (rawEstoque === "" || rawEstoque === null) { alert("Informe a quantidade em estoque."); return; }
     const estoqueNum = Number(String(rawEstoque).trim());
     if (!Number.isFinite(estoqueNum) || !Number.isInteger(estoqueNum)) { alert("Quantidade inválida. Use um número inteiro."); return; }
     if (estoqueNum < 0) { alert("Quantidade não pode ser negativa."); return; }
     if (String(Math.abs(estoqueNum)).length > 7) { alert("Quantidade muito grande (máx. 7 dígitos)."); return; }
 
-    // build product object
+    // montar objeto do produto
     const produto = {
       nome,
       sku,
@@ -166,7 +139,7 @@ if (form) {
       dataCadastro: new Date().toISOString()
     };
 
-    // save to Firestore
+     // salvar no Firestore
     try {
       await addDoc(collection(db, "produtos"), produto);
       alert("Produto cadastrado com sucesso!");
@@ -177,7 +150,7 @@ if (form) {
     }
   });
 
-  // prevent accidental wheel change on number inputs
+  // impedir mudança acidental com a roda do mouse em inputs numéricos
   document.querySelectorAll('input[type="number"]').forEach(i => {
     i.addEventListener('wheel', (ev) => ev.target.blur());
   });

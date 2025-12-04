@@ -95,11 +95,11 @@ if (typeof onAuthStateChanged === "function") {
   });
 }
 
-/* Logout / voltar */
+/* voltar */
 if (voltar) voltar.addEventListener("click", () => window.location.href = "produtos.html");
 if (logoutBtn) logoutBtn.addEventListener("click", () => signOut(auth).then(() => (window.location = "index.html")));
 
-/* submit */
+/* envio do formulário */
 if (form) {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
